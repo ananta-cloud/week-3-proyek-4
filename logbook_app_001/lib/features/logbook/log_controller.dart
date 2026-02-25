@@ -6,39 +6,73 @@ import '../models/log_model.dart';
 
 class LogController {
   final ValueNotifier<List<LogModel>> logsNotifier = ValueNotifier([]);
+  final ValueNotifier<List<LogModel>> filteredLogsNotifier = ValueNotifier([]);
   static const String _storageKey = 'user_logs_data';
   final List<LogModel> _logs = [];
-  List<LogModel> get logs => _logs;
+  String lastQuery = "";
 
   LogController() {
     loadFromDisk();
   }
 
-  void addLog(String title, String desc,LogModel log) {
+  void searchLogs(String query) {
+    lastQuery = query;
+    if (query.isEmpty) {
+      filteredLogsNotifier.value = logsNotifier.value;
+    } else {
+      filteredLogsNotifier.value = logsNotifier.value
+          .where((log) => log.title.toLowerCase().contains(query.toLowerCase()))
+          .toList();
+    }
+  }
+
+  void _updateFilteredLogs() {
+    if (lastQuery.isEmpty) {
+      filteredLogsNotifier.value = List<LogModel>.from(logsNotifier.value);
+    } else {
+      filteredLogsNotifier.value = logsNotifier.value
+          .where(
+            (log) => log.title.toLowerCase().contains(lastQuery.toLowerCase()),
+          )
+          .toList();
+    }
+  }
+
+  void addLog(String title, String desc, String kategori) {
     final newLog = LogModel(
       title: title,
       description: desc,
+      kategori: kategori,
       date: DateTime.now().toString(),
     );
     logsNotifier.value = [...logsNotifier.value, newLog];
+    _updateFilteredLogs();
     saveToDisk();
   }
 
-  void updateLog(int index, String title, String desc) {
+  void updateLog(LogModel oldLog, String title, String desc, String kategori) {
     final currentLogs = List<LogModel>.from(logsNotifier.value);
-    currentLogs[index] = LogModel(
-      title: title,
-      description: desc,
-      date: DateTime.now().toString(),
-    );
-    logsNotifier.value = currentLogs;
-    saveToDisk();
+    final index = currentLogs.indexOf(oldLog);
+    
+    if (index != -1) {
+      currentLogs[index] = LogModel(
+        title: title,
+        description: desc,
+        kategori: kategori, 
+        date: DateTime.now().toString(),
+      );
+      
+      logsNotifier.value = currentLogs;
+      _updateFilteredLogs();
+      saveToDisk(); 
+    }
   }
 
-  void removeLog(int index) {
+  void removeLog(LogModel log) {
     final currentLogs = List<LogModel>.from(logsNotifier.value);
-    currentLogs.removeAt(index);
+    currentLogs.remove(log);
     logsNotifier.value = currentLogs;
+    _updateFilteredLogs();
     saveToDisk();
   }
 
@@ -56,6 +90,8 @@ class LogController {
     if (data != null) {
       final List decoded = jsonDecode(data);
       logsNotifier.value = decoded.map((e) => LogModel.fromMap(e)).toList();
+      filteredLogsNotifier.value = logsNotifier.value;
+      _updateFilteredLogs();
     }
   }
 }
